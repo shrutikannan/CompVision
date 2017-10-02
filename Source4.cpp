@@ -20,10 +20,14 @@ Mat negate_pixel(Mat src);
 //void RecursiveConnectedComponents(Mat img_negate, int row, int col, int label);
 void StackConnectedComponents(Mat img_binary, Mat1i labels, Mat img_labelled);
 void show_components(Mat img_negate);
+void img_erosion(Mat src, Mat dst);
+
 vector<Mat> neighbour_list;
-void applyCustomColormap(const Mat1i& src, Mat3b& dst);
+//void applyCustomColormap(const Mat1i& src, Mat3b& dst);
 Mat output;// = Mat::zeros(img.size(), CV_8UC3);
-void color(Mat1i labels, Mat output, int label);
+
+vector <vector<Point2i>> blobs; //initialize vector to store all blobs
+
 
 int main()
 {
@@ -54,19 +58,43 @@ int main()
 	Mat img_labelled = img_binary.clone();
 	StackConnectedComponents(img_binary, labels, img_labelled);
 	
-//	cout << "_____________"<<labels;
-//	Mat3b out;
-//	applyCustomColormap(labels, out);
-//	show_components(out);
-	imshow("Labels", out);
-//	cout << output;
-//	imshow("Labels", output);
-	
+	Mat output = Mat::zeros(img.size(), CV_8UC3);
+	for (size_t i = 0; i < blobs.size(); i++) { 	// Randomly color the blobs
+		unsigned char r = 255 * (rand() / 1.0 + RAND_MAX);
+		unsigned char g = 255 * (rand() / 1.0 + RAND_MAX);
+		unsigned char b = 255 * (rand() / 1.0 + RAND_MAX);
+		for (size_t j = 0; j < blobs[i].size(); j++) {
+			int x = blobs[i][j].x;
+			int y = blobs[i][j].y;
+			output.at<Vec3b>(y, x)[0] = b;
+			output.at<Vec3b>(y, x)[1] = g;
+			output.at<Vec3b>(y, x)[2] = r;
+		}
+	}
+
+	imshow("labelled", output);
 	waitKey(0);
 	return 0;
 }
-
-
+/*
+void RecursiveConnectedComponents(Mat src, int row, int col, int label) {
+//	RecursiveConnectedComponents(pixel, label)
+//			for each unmarked neighbor
+//			assign the label to the neighbor
+//			call RecursiveConnectedComponents(neighbor, label)
+	
+	src.at<uchar>(row, col) = label;// assign label to current pixel
+	for (int dx = -1; dx <= 1; dx++) { // loop over neighbours
+		int *rowPtr = (int*)src.ptr(row);
+		for (int dy = -1; dy <= 1; dy++) {
+			if (rowPtr[col] == 1) { // for each neighbour pixel, check if label is -1 (part of object)
+				RecursiveConnectedComponents(src, row + dx, col + dy, label); // if yes, then change label for that too, and look among its neighbours
+			}
+		}
+	}
+	return;
+}
+*/
 
 /*
 StackConnectedComponents(label)
@@ -96,6 +124,7 @@ void StackConnectedComponents(Mat img_binary, Mat1i labels, Mat img_labelled) {
 		for (int col = 0; col<w; col++) {
 			if ((src(row, col)) > 0) {   // Non zero element
 //			if (rowP[col] > 0) {
+				vector <Point2i> blob;
 				std::stack<int, std::vector<int>> stack2; // Declare a stack
 				i = col + row*w; // information about the current row and col is here
 				stack2.push(i); // store in the stack
@@ -138,23 +167,11 @@ void StackConnectedComponents(Mat img_binary, Mat1i labels, Mat img_labelled) {
 						src(y2 + 1, x2 + 1) = 0;
 					}
 				}
+				blobs.push_back(comp);
 				++label;
-				for (int k = 0; k <comp.size(); ++k)
-				{
-					labels(comp[k]) = label;
-	//				int *rowP = (int*)img_labelled.ptr(comp[k].x);
-	//				rowP[comp[k].y] = label;
-					//cout << comp[k].x;
-					//img_labelled.at<uchar>(comp[k].x, comp[k].y) = label;
-					
-				}
-				cout << labels.size();
 			}
 		}
 	}
-	applyCustomColormap(labels, out);
-//	applyColorMap(labels, out, COLORMAP_JET);
-//	color(labels, output, label);
 	return;
 }
 
@@ -182,79 +199,11 @@ void show_components(Mat img_negate) {
 	}
 }
 /*
-void color(Mat1i labels, Mat output, int label) {
-	
-	for (size_t i = 0; i < label - 1; i++) {
-		unsigned char r = 255 * (rand() / 1.0 + RAND_MAX);
-		unsigned char g = 255 * (rand() / 1.0 + RAND_MAX);
-		unsigned char b = 255 * (rand() / 1.0 + RAND_MAX);
-		for (int j = 1;j<labels.size(); j++) {
-			int x = blobs[i][j].x;
-			int y = blobs[i][j].y;
-			output.at<Vec3b>(y, x)[0] = b;
-			output.at<Vec3b>(y, x)[1] = g;
-			output.at<Vec3b>(y, x)[2] = r;
-			cout << output;
-		}
-		for (int row = 0; row < labels.rows - 1; row++) {
-			int *rowP = (int*)labels.ptr(row);
-			for (int col = 1; col < labels.cols - 1; col++) {
-				cout << rowP[col];
-			}
-			cout << endl;
+void img_erosion(Mat src, Mat dst) {
+	for (int row = 0;row < src.rows;row++) {
+		int *rowP = (int*)src.ptr(row);
+		for (int col = 0; col < src.col-1;col++) {
+			if (rowP[col] && rowP[col+1] && )
 		}
 	}
 }*/
-
-
-void applyCustomColormap(const Mat1i& src, Mat3b& dst) //https://stackoverflow.com/questions/35993895/create-a-rgb-image-from-pixel-labels/35995427#35995427
-{
-	// Create JET colormap
-
-	double m;
-	minMaxLoc(src, nullptr, &m);
-	m++;
-
-	int n = ceil(m / 4);
-	Mat1d u(n * 3 - 1, 1, double(1.0));
-
-	for (int i = 1; i <= n; ++i) {
-		u(i - 1) = double(i) / n;
-		u((n * 3 - 1) - i) = double(i) / n;
-	}
-
-	std::vector<double> g(n * 3 - 1, 1);
-	std::vector<double> r(n * 3 - 1, 1);
-	std::vector<double> b(n * 3 - 1, 1);
-	for (int i = 0; i < g.size(); ++i)
-	{
-		g[i] = ceil(double(n) / 2) - (int(m) % 4 == 1 ? 1 : 0) + i + 1;
-		r[i] = g[i] + n;
-		b[i] = g[i] - n;
-	}
-
-	g.erase(std::remove_if(g.begin(), g.end(), [m](double v) { return v > m; }), g.end());
-	r.erase(std::remove_if(r.begin(), r.end(), [m](double v) { return v > m; }), r.end());
-	b.erase(std::remove_if(b.begin(), b.end(), [](double v) { return v < 1.0; }), b.end());
-
-	Mat1d cmap(m, 3, double(0.0));
-	for (int i = 0; i < r.size(); ++i) { cmap(int(r[i]) - 1, 0) = u(i); }
-	for (int i = 0; i < g.size(); ++i) { cmap(int(g[i]) - 1, 1) = u(i); }
-	for (int i = 0; i < b.size(); ++i) { cmap(int(b[i]) - 1, 2) = u(u.rows - b.size() + i); }
-
-	Mat3d cmap3 = cmap.reshape(3);
-
-	Mat3b colormap;
-	cmap3.convertTo(colormap, CV_8U, 255.0);
-
-	// Apply color mapping
-	dst = Mat3b(src.rows, src.cols, Vec3b(0, 0, 0));
-	for (int r = 0; r < src.rows; ++r)
-	{
-		for (int c = 0; c < src.cols; ++c)
-		{
-			dst(r, c) = colormap(src(r, c));
-		}
-	}
-}
-
