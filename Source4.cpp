@@ -12,6 +12,7 @@ Title: Assignment 03
 #include <vector>
 #include <iomanip>
 #include <stack>
+#include <string>
 
 using namespace cv;
 using namespace std;
@@ -22,10 +23,13 @@ void StackConnectedComponents(Mat img_binary);
 void show_components(Mat img_negate);
 void img_erosion(Mat src, Mat dst);
 void img_dilation(Mat src, Mat dst);
+void img_boundary(Mat src, std::vector<Point>& BoundaryPoints);
 vector<Mat> neighbour_list;
 //void applyCustomColormap(const Mat1i& src, Mat3b& dst);
 Mat output;// = Mat::zeros(img.size(), CV_8UC3);
-
+void TraceBoundaryPoints(Mat InputImage,
+	int Width_i, int Height_i,
+	std::vector<Point2i>& BoundaryPoints);
 vector <vector<Point2i>> blobs; //initialize vector to store all blobs
 
 
@@ -44,7 +48,7 @@ int main()
 	}
 	}
 	*/
-	Mat img = imread("tumor-fold.png", IMREAD_GRAYSCALE);
+	Mat img = imread("open-bw-full.png", IMREAD_GRAYSCALE);
 	imshow("image", img);
 
 	Mat img_negate1 = negate_pixel(img);
@@ -58,7 +62,7 @@ int main()
 	img_dilation(img_negate1, img_negate);
 	imshow("eroded", img_negate);
 	
-	Mat img_binary;
+	Mat img_binary = Mat::zeros(img_negate.size(), CV_8UC1);
 	threshold(img_negate, img_binary, 0.0, 1.0, THRESH_BINARY);
 	imshow("Binary image", img_binary);
 
@@ -78,9 +82,118 @@ int main()
 		}
 	}
 	imshow("labelled", output);
+	std::vector<Point> BoundaryPoints;
+	img_boundary(img_binary, BoundaryPoints);
+//	TraceBoundaryPoints(img, img_binary.rows, img_binary.cols, BoundaryPoints);
+	Mat bound = Mat::zeros(img_binary.size(), CV_8UC1);
+//	cout << BoundaryPoints.size();
+
+	for (int i = 0; i < BoundaryPoints.size(); i++) {
+		
+		int x = BoundaryPoints[i].x;
+		int y = BoundaryPoints[i].y;
+		//cout << BoundaryPoints[i] << " " << x << " " << y << endl;
+		//int* rowP = (int*)dst.ptr(x);
+		bound.at<uchar>(x,y) = 255;
+//		dst.at<Vec3b>(y, x)[0] = 0;
+//		dst.at<Vec3b>(y, x)[1] = 255;
+//		dst.at<Vec3b>(y, x)[2] = 0;
+	}
+	imshow("boundary",bound);
 	waitKey(0);
 	return 0;
 }
+
+void img_boundary(Mat src, std::vector<Point>& BoundaryPoints) {
+	// 1st non zero pixel is start 's'
+	// current pixel is 'p'
+	// pixel before p is 'b' backtracked pixel
+	// 3*3 neighbourhood of p, starting from b, search clockwise for the next non zero pixel
+	// if found, that becomes the current pixel, and what p was, becomes the backtracked pixel
+
+	int rows = src.rows;
+	int cols = src.cols;
+	int no_pixels = rows*cols;
+	int neighborhood[16][2] = { {0,-1 },{-1,-1},{-1,0},{-1,1},{0,1},{1,1},{1,0},{1,-1},{ 0,-1 },{ -1,-1 },{ -1,0 },{ -1,1 },{ 0,1 },{ 1,1 },{ 1,0 },{ 1,-1 } };
+	BoundaryPoints.clear();
+	cout << "1" << BoundaryPoints.size() << endl;;
+	Point s, b, c, p;
+	Point boundarypixel;
+	int temp = 0;
+	for (int row = 0; row < rows; row++) { // loop to find the starting point
+		int* rowP = (int*)src.ptr(row);
+		for (int col = 0; col < cols; col++) {
+			if (rowP[col] != 0) { // 1st non zero element found
+				s.x = row; // = col + row*rows; //starting boundary pixel
+				s.y = col;
+				b.x = row; //(col - 1) + row*rows; // backtrack pixel
+				b.y = col - 1;
+				BoundaryPoints.push_back(s); // storing s in the final boundary
+				temp = 1; // since we have found the starting point s
+				break;
+			}
+		}
+		if (temp == 1) {
+			temp = 0;
+			break;
+		}
+	}
+	cout << "2" << BoundaryPoints.size() << endl;;
+	p = s; // current pixel to be analysed, p, is s
+	cout << "s = "<< s <<endl;
+	c.x = p.x + neighborhood[0][0]; // initialise c with the neighborhood pixel of s
+	c.y = p.y + neighborhood[0][1];
+	cout << "before while" << endl;
+	vector<Point> c_values;
+	int start_idx = 0;
+	int end_idx = 8;
+	while (c != s) { // boundary gets completed once c is equal to s
+		//cout << "p= " << p << endl;
+		cout << "3" << BoundaryPoints.size() << endl;
+
+		for (int ind_nei = start_idx; ind_nei < end_idx; ind_nei++) { // loop around neighbours
+			cout << "inside for" << endl;
+			cout << "1 start= " << start_idx << " " << "end=" << end_idx << endl;
+			c.x = p.x + neighborhood[ind_nei][0]; // initialise c with the neighborhood pixel of s
+			c.y = p.y + neighborhood[ind_nei][1];
+			cout << "c = " << c << endl;
+			c_values.push_back(c);
+			for (int i = 0;i < c_values.size();i++)
+				cout << c_values[i];
+			cout << endl;
+
+			cout << "1 c_values = " << c_values.size() << endl;
+			int* rowP = (int*)src.ptr(c.x);
+			if (rowP[c.y] != 0) { // if neighboring pixel is also white
+				BoundaryPoints.push_back(c);				
+				p = c_values.back();
+				cout << "2 c_values = " << c_values.size() << endl;
+				cout << "updated p = " << p << endl;
+				c_values.pop_back();
+				cout << "3 c_values = " << c_values.size() << endl;
+				b = c_values.back();
+				cout << "updated b = " << b << endl;
+				c_values.clear();
+				Point offset;
+				offset.x = b.x - p.x;
+				offset.y = b.y - p.y;
+				for (int idx = 0; idx < 8; idx++) {
+					if (offset.x == neighborhood[idx][0] && offset.y == neighborhood[idx][1]) {
+						start_idx = idx;
+						end_idx = start_idx + 8;
+						cout << "start= " << start_idx << " " << "end=" << end_idx <<endl;
+						break;
+					}
+				}
+				break; // p is updated, need to check new neighbours
+			}
+		}
+		//cout << endl;
+	}
+	return;
+}
+
+
 void StackConnectedComponents(Mat img_binary) {
 	Mat1b src = img_binary > 0;
 
@@ -196,3 +309,9 @@ void img_dilation(Mat src, Mat dst) {
 	}
 	return;
 }
+/*
+References:
+https://www.researchgate.net/post/What_is_a_basic_difference_between_Mat_Mat3b_Matx_etc_if_any_left_in_OpenCV
+http://docs.opencv.org/3.2.0/d7/d4d/tutorial_py_thresholding.html
+
+*/
