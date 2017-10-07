@@ -1,6 +1,6 @@
 /**
 CS585_Lab4.cpp
-
+//Author - Prateek Mehta
 CS585 Image and Video Computing Fall 2017
 Lab 4
 --------------
