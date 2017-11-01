@@ -28,7 +28,7 @@ int main() {
 		cout << "Current file: " << i << endl;
 		char file_name[100];
 		Mat labelled, binary;
-		sprintf(file_name, "./Seg_images/img%d.jpg", i + 1); // Path to store the images and filename
+		sprintf(file_name, "./Seg_images/img%d.jpg", i +749 + 1); // Path to store the images and filename
 		convertFileToMat(filename_seg[i], labelled, binary); // Create binary for each file
 		imwrite(file_name, binary); // Write binary to filename
 	}
