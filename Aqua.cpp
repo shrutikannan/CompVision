@@ -108,6 +108,7 @@ int main(int argc, char **argv)
 		Mat binary3C;
 
 		//finding contours
+		file_data1.clear();
 		file_processing(frame_curr, file_data1, binary3C ,centroids);
 
 		for (int k = 0; k<track_obj.size(); k++)
